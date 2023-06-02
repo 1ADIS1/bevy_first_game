@@ -7,18 +7,27 @@ pub const PLAYER_SIZE: f32 = 64.0; // Player's sprite size.
 pub const ENEMIES_NUM: usize = 4;
 pub const ENEMY_SIZE: f32 = 64.0;
 pub const ENEMY_SPEED: f32 = 400.0;
+pub const STARS_NUM: usize = 10;
+pub const STARS_SPAWN_PERIOD: f32 = 1.0;
+pub const STAR_SIZE: f32 = 30.0;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_startup_systems((spawn_player, spawn_camera, spawn_enemies))
+        .init_resource::<Score>()
+        .init_resource::<StarTimer>()
+        .add_startup_systems((spawn_player, spawn_camera, spawn_enemies, spawn_star))
         .add_systems((
             move_player,
             limit_player_movement,
             move_enemy,
             update_enemy_direction,
             limit_enemy_movement,
-            check_collision,
+            check_enemy_collision,
+            check_star_collision,
+            update_score,
+            star_timer_tick,
+            spawn_stars_over_time,
         ))
         .run();
 }
@@ -31,9 +40,36 @@ pub struct Enemy {
     pub direction: Vec3,
 }
 
+#[derive(Component)]
+pub struct Star {}
+
+#[derive(Resource)]
+pub struct Score {
+    pub value: usize,
+}
+
+impl Default for Score {
+    fn default() -> Self {
+        Score { value: 0 }
+    }
+}
+
+#[derive(Resource)]
+pub struct StarTimer {
+    pub timer: Timer,
+}
+
+impl Default for StarTimer {
+    fn default() -> Self {
+        StarTimer {
+            timer: Timer::from_seconds(STARS_SPAWN_PERIOD, TimerMode::Repeating),
+        }
+    }
+}
+
 // Update player transform every frame.
 pub fn move_player(
-    clock: Res<Time>,
+    time: Res<Time>,
     mut player_query: Query<&mut Transform, With<Player>>,
     keyboard_input: Res<Input<KeyCode>>,
 ) {
@@ -65,7 +101,7 @@ pub fn move_player(
         direction = direction.normalize();
     }
 
-    player_transform.translation += direction * PLAYER_SPEED * clock.delta_seconds();
+    player_transform.translation += direction * PLAYER_SPEED * time.delta_seconds();
 }
 
 // Prevents player for going off the screen borders.
@@ -106,9 +142,9 @@ pub fn limit_player_movement(
     player_transform.translation = player_translation;
 }
 
-pub fn move_enemy(mut enemy_query: Query<(&mut Transform, &Enemy)>, clock: Res<Time>) {
+pub fn move_enemy(mut enemy_query: Query<(&mut Transform, &Enemy)>, time: Res<Time>) {
     for (mut transform, enemy) in enemy_query.iter_mut() {
-        transform.translation += enemy.direction * ENEMY_SPEED * clock.delta_seconds();
+        transform.translation += enemy.direction * ENEMY_SPEED * time.delta_seconds();
     }
 }
 
@@ -189,7 +225,7 @@ pub fn limit_enemy_movement(
 }
 
 // Checks if the player and enemy collide with each other.
-pub fn check_collision(
+pub fn check_enemy_collision(
     mut commands: Commands,
     mut player_query: Query<(Entity, &Transform), With<Player>>,
     enemy_query: Query<&Transform, With<Enemy>>,
@@ -223,6 +259,37 @@ pub fn check_collision(
             audio.play(sound_effect);
 
             commands.entity(player_entity).despawn();
+        }
+    }
+}
+
+pub fn check_star_collision(
+    mut commands: Commands,
+    player_query: Query<&Transform, With<Player>>,
+    star_query: Query<(&Transform, Entity), With<Star>>,
+    audio: Res<Audio>,
+    asset_server: Res<AssetServer>,
+    mut score: ResMut<Score>,
+) {
+    if let Ok(player_transform) = player_query.get_single() {
+        let player_radius = PLAYER_SIZE / 2.0;
+
+        for (star_transform, star_entity) in star_query.iter() {
+            let star_radius = STAR_SIZE / 2.0;
+
+            if player_transform
+                .translation
+                .distance(star_transform.translation)
+                < player_radius + star_radius
+            {
+                // Play the star sound, increment the score, and despawn the star.
+                let star_sound = asset_server.load("audio/interface/confirmation_001.ogg");
+                audio.play(star_sound);
+
+                score.value += 1;
+
+                commands.entity(star_entity).despawn();
+            }
         }
     }
 }
@@ -275,4 +342,61 @@ pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Pr
         transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
         ..default()
     });
+}
+
+pub fn spawn_star(
+    mut commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    asset_server: Res<AssetServer>,
+) {
+    let primary_window = window_query.get_single().unwrap();
+
+    for _ in 0..STARS_NUM {
+        let x_pos = random::<f32>() * primary_window.width();
+        let y_pos = random::<f32>() * primary_window.height();
+
+        commands.spawn((
+            SpriteBundle {
+                transform: Transform::from_xyz(x_pos, y_pos, 0.0),
+                texture: asset_server.load("sprites/Default/star.png"),
+                ..default()
+            },
+            Star {},
+        ));
+    }
+}
+
+// Unlike spawn_star does not creates STARS_NUM of stars, but instead periodicall spawns them.
+pub fn spawn_stars_over_time(
+    mut commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    asset_server: Res<AssetServer>,
+    star_timer: Res<StarTimer>,
+) {
+    let primary_window = window_query.get_single().unwrap();
+
+    if star_timer.timer.just_finished() {
+        let x_pos = random::<f32>() * primary_window.width();
+        let y_pos = random::<f32>() * primary_window.height();
+
+        commands.spawn((
+            SpriteBundle {
+                transform: Transform::from_xyz(x_pos, y_pos, 0.0),
+                texture: asset_server.load("sprites/Default/star.png"),
+                ..default()
+            },
+            Star {},
+        ));
+    }
+}
+
+// Prints the score whenever it has changed.
+pub fn update_score(score: Res<Score>) {
+    if score.is_changed() {
+        println!("Current score: {}", score.value);
+    }
+}
+
+pub fn star_timer_tick(mut star_timer: ResMut<StarTimer>, time: Res<Time>) {
+    star_timer.timer.tick(time.delta());
 }

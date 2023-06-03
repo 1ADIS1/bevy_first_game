@@ -23,7 +23,8 @@ fn main() {
         .add_plugin(PlayerPlugin)
         .add_plugin(ScorePlugin)
         .add_plugin(StarPlugin)
-        .add_startup_systems((spawn_camera,))
-        .add_systems((close_game, handle_game_over_event))
+        .add_startup_system(spawn_camera)
+        .add_system(close_game)
+        .add_system(handle_game_over_event)
         .run();
 }

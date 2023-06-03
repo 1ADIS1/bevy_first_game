@@ -16,7 +16,8 @@ pub struct StarPlugin;
 impl Plugin for StarPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<StarTimer>()
-            .add_startup_systems((spawn_star,))
-            .add_systems((star_timer_tick, spawn_stars_over_time));
+            .add_startup_system(spawn_star)
+            .add_system(spawn_stars_over_time)
+            .add_system(star_timer_tick);
     }
 }

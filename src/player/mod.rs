@@ -12,11 +12,10 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_systems((spawn_player,)).add_systems((
-            move_player,
-            limit_player_movement,
-            check_enemy_collision,
-            check_star_collision,
-        ));
+        app.add_startup_system(spawn_player)
+            .add_system(move_player)
+            .add_system(limit_player_movement.after(move_player))
+            .add_system(check_enemy_collision)
+            .add_system(check_star_collision);
     }
 }

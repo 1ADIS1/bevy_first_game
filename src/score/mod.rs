@@ -12,6 +12,8 @@ impl Plugin for ScorePlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.init_resource::<Score>()
             .init_resource::<HighScores>()
-            .add_systems((update_score, update_high_scores, print_high_scores));
+            .add_system(update_score)
+            .add_system(update_high_scores)
+            .add_system(print_high_scores);
     }
 }

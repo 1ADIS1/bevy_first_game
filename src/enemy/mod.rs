@@ -17,13 +17,11 @@ pub struct EnemyPlugin;
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EnemyTimer>()
-            .add_startup_systems((spawn_enemies,))
-            .add_systems((
-                move_enemy,
-                update_enemy_direction,
-                limit_enemy_movement,
-                enemy_timer_tick,
-                spawn_enemies_over_time,
-            ));
+            .add_startup_system(spawn_enemies)
+            .add_system(move_enemy)
+            .add_system(update_enemy_direction.after(move_enemy))
+            .add_system(limit_enemy_movement.after(update_enemy_direction))
+            .add_system(enemy_timer_tick)
+            .add_system(spawn_enemies_over_time);
     }
 }

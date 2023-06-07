@@ -1,7 +1,7 @@
 use super::components::*;
 use super::resources::*;
 use super::{ENEMIES_NUM, ENEMY_SPEED};
-use crate::player::PLAYER_SIZE;
+use crate::game::player::PLAYER_SIZE;
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -140,6 +140,12 @@ pub fn spawn_enemies_over_time(
                 direction: Vec3::new(x_dir, y_dir, 0.0).normalize(),
             },
         ));
+    }
+}
+
+pub fn despawn_enemies(mut commands: Commands, enemy_query: Query<Entity, With<Enemy>>) {
+    for enemy in enemy_query.iter() {
+        commands.entity(enemy).despawn();
     }
 }
 

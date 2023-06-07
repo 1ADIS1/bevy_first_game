@@ -1,4 +1,5 @@
 use super::events::GameOver;
+use super::AppState;
 
 use bevy::app::AppExit;
 use bevy::prelude::*;
@@ -13,6 +14,32 @@ pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Pr
     });
 }
 
+pub fn transition_to_game_state(
+    mut commands: Commands,
+    keyboard_input: Res<Input<KeyCode>>,
+    app_state: Res<State<AppState>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::G) {
+        if app_state.0 != AppState::Game {
+            commands.insert_resource(NextState(Some(AppState::Game)));
+            println!("Entered Game state!");
+        }
+    }
+}
+
+pub fn transition_to_menu_state(
+    mut commands: Commands,
+    keyboard_input: Res<Input<KeyCode>>,
+    app_state: Res<State<AppState>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::M) {
+        if app_state.0 != AppState::Menu {
+            commands.insert_resource(NextState(Some(AppState::Menu)));
+            println!("Entered Menu state!");
+        }
+    }
+}
+
 pub fn close_game(
     keyboard_input: Res<Input<KeyCode>>,
     mut app_exit_event_writer: EventWriter<AppExit>,
@@ -22,10 +49,14 @@ pub fn close_game(
     }
 }
 
-pub fn handle_game_over_event(mut game_over_event_reader: EventReader<GameOver>) {
+pub fn handle_game_over_event(
+    mut commands: Commands,
+    mut game_over_event_reader: EventReader<GameOver>,
+) {
     for event in game_over_event_reader.iter() {
         println!("Game Over!");
         println!("Final score: {}", event.score_value);
+        commands.insert_resource(NextState(Some(AppState::GameOver)));
         return;
     }
 }
